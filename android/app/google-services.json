@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "365700217562",
+    "firebase_url": "https://assessment3-de9da-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "assessment3-de9da",
+    "storage_bucket": "assessment3-de9da.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:365700217562:android:6b6954be0de1f1b5c683e3",
+        "android_client_info": {
+          "package_name": "com.example.assessment3"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyATLYn7aLl99hMn2YD5js48xT_bmWWednA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
