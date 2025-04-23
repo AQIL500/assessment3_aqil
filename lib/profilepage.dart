@@ -125,7 +125,7 @@ class ProfilePage extends StatelessWidget {
                 onPressed: () {
                   Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => AnalyticsPage()));
+                      MaterialPageRoute(builder: (context) => HomePage()));
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(0xFF4DD0E1), // Turquoise
