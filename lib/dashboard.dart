@@ -1,262 +1,318 @@
-import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
+import 'package:assessment3/FAQs.dart';
 import 'package:assessment3/profilepage.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_database/firebase_database.dart';
 
-class AnalyticsPage extends StatefulWidget {
-  const AnalyticsPage({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<AnalyticsPage> createState() => _AnalyticsPageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _AnalyticsPageState extends State<AnalyticsPage> {
-  int _currentIndex = 1;
-  final List<double> temperatureData = [24.5, 25.0, 24.8, 25.2, 24.9];
-  final List<double> humidityData = [60, 62, 58, 59, 61];
-  final List<double> soilMoistureData = [40, 42, 38, 37, 39];
-  final List<double> lightData = [300, 310, 305, 320, 315];
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  bool _isPumpOn = false;
 
-  void _onTabTapped(int index) {
-    if (index == _currentIndex) return;
-    final pages = [ ProfilePage()];
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => pages[index]),
+  final DatabaseReference _pumpRef = FirebaseDatabase.instance.ref("sensor_data/pump_status");
+  final DatabaseReference _sensorRef = FirebaseDatabase.instance.ref("sensor_data");
+
+  Map<String, dynamic> _sensorData = {
+    'temperature': 'Loading...',
+    'humidity': 'Loading...',
+    'soilMoisture': 'Loading...',
+    'light': 'Loading...'
+  };
+
+  // Define the blue ocean color palette
+  final Color _primaryColor = const Color(0xFF1565C0);
+  final Color _secondaryColor = const Color(0xFF64B5F6);
+  final Color _accentColor = const Color(0xFF00ACC1);
+  final Color _backgroundColor = const Color(0xFFE3F2FD);
+  final Color _cardColor = const Color(0xFFBBDEFB);
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
     );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.5, curve: Curves.easeIn),
+      ),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.3, 1.0, curve: Curves.elasticOut),
+      ),
+    );
+
+    _controller.forward();
+    _listenToPumpStatus();
+    _listenToSensorData();
+  }
+
+  void _listenToPumpStatus() {
+    _pumpRef.onValue.listen((event) {
+      final value = event.snapshot.value;
+      if (value != null && value is bool) {
+        setState(() {
+          _isPumpOn = value;
+        });
+      }
+    });
+  }
+
+  void _listenToSensorData() {
+    _sensorRef.onValue.listen((event) {
+      final data = event.snapshot.value;
+      if (data != null && data is Map) {
+        setState(() {
+          _sensorData = Map<String, dynamic>.from(data);
+        });
+      }
+    });
+  }
+
+  void _togglePump(bool value) async {
+    try {
+      await _pumpRef.set(value);
+      setState(() {
+        _isPumpOn = value;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Water Pump ${value ? 'ON' : 'OFF'}'),
+          backgroundColor: value ? Colors.blue : Colors.blueGrey,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to control pump'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text(
-          "Analytics Dashboard",
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-            fontSize: 20,
-          ),
-        ),
-        backgroundColor: const Color(0xFF1976D2), // Marine blue
+        title: const Text('Smart IoT Farming'),
+        centerTitle: true,
+        backgroundColor: _primaryColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      backgroundColor: const Color(0xFFF5F9FF), // Light blue background
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          const SizedBox(height: 8),
-          _buildHeaderCard(),
-          const SizedBox(height: 24),
-          _buildGraphCard("Temperature (°C)", temperatureData, const Color(0xFFE53935)),
-          const SizedBox(height: 20),
-          _buildGraphCard("Humidity (%)", humidityData, const Color(0xFF1E88E5)),
-          const SizedBox(height: 20),
-          _buildGraphCard("Soil Moisture (%)", soilMoistureData, const Color(0xFF43A047)),
-          const SizedBox(height: 20),
-          _buildGraphCard("Light Level (lux)", lightData, const Color(0xFFFFB300)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.account_circle),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ProfilePage()));
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => HelpPage()));
+            },
+          ),
         ],
       ),
+      body: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _fadeAnimation.value,
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: child,
+            ),
+          );
+        },
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFE3F2FD),
+                Color(0xFFBBDEFB),
+              ],
+            ),
+          ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Card(
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    color: _cardColor,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          Image.network(
+                            'https://smartfarm.nl/wp-content/uploads/2024/02/yoast-organisation-logo.jpg',
+                            height: 100,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Welcome to Smart Farm',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: _primaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Real-time monitoring and control of your farming operations',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.blueGrey[800]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Farm Status Overview',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    children: [
+                      _buildStatusCard('Temperature', '${_sensorData['temperature']}°C', Icons.thermostat, _accentColor),
+                      _buildStatusCard('Humidity', '${_sensorData['humidity']}%', Icons.water_drop, _secondaryColor),
+                      _buildStatusCard('Soil Moisture', '${_sensorData['soil_moisture']}', Icons.grass, Colors.blue[700]!),
+                      _buildStatusCard('Light Level', '${_sensorData['ldr']}', Icons.light_mode, Colors.blue[300]!),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    color: _cardColor,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Water Pump Control',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _primaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Column(
+                                children: [
+                                  Icon(
+                                    Icons.opacity,
+                                    size: 40,
+                                    color: _isPumpOn ? _accentColor : Colors.blueGrey,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: _isPumpOn ? Colors.blue : Colors.blueGrey,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Switch.adaptive(
+                                value: _isPumpOn,
+                                onChanged: _togglePump,
+                                activeColor: _accentColor,
+                                activeTrackColor: _secondaryColor,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            _isPumpOn ? 'WATER PUMP ACTIVE' : 'WATER PUMP INACTIVE',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: _isPumpOn ? _accentColor : Colors.blueGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      // Bottom navigation bar has been removed
     );
   }
 
-  Widget _buildHeaderCard() {
+  Widget _buildStatusCard(String title, String value, IconData icon, Color color) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
-      color: Colors.white,
+      color: _cardColor,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                Icon(Icons.insights, color: Colors.blue.shade700, size: 24),
-                const SizedBox(width: 8),
-                Text(
-                  "Sensor Analytics",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade800,
-                  ),
-                ),
-              ],
-            ),
+            Icon(icon, size: 30, color: color),
             const SizedBox(height: 8),
-            Text(
-              "View real-time and historical data trends from your farm sensors",
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.blueGrey.shade600,
-              ),
-            ),
+            Text(title, style: TextStyle(fontSize: 14, color: Colors.blueGrey[800])),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _primaryColor)),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildGraphCard(String title, List<double> values, Color color) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      shadowColor: Colors.blue.shade100,
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _getIconForTitle(title),
-                    color: color,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade800,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 180,
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: true,
-                    horizontalInterval: _getInterval(values),
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey.shade200,
-                      strokeWidth: 1,
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: 1,
-                        reservedSize: 22,
-                        getTitlesWidget: (value, meta) => Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            "Day ${value.toInt() + 1}",
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.blueGrey.shade600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        interval: _getInterval(values),
-                        reservedSize: 40,
-                        getTitlesWidget: (value, meta) => Text(
-                          value.toInt().toString(),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.blueGrey.shade600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    rightTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  borderData: FlBorderData(
-                    show: true,
-                    border: Border.all(
-                      color: Colors.grey.shade300,
-                      width: 1,
-                    ),
-                  ),
-                  minX: 0,
-                  maxX: values.length.toDouble() - 1,
-                  minY: _getMinY(values),
-                  maxY: _getMaxY(values),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: List.generate(
-                        values.length,
-                            (index) => FlSpot(index.toDouble(), values[index]),
-                      ),
-                      isCurved: true,
-                      color: color,
-                      barWidth: 3,
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: color.withOpacity(0.1),
-                      ),
-                      dotData: FlDotData(
-                        show: true,
-                        getDotPainter: (spot, percent, barData, index) =>
-                            FlDotCirclePainter(
-                              radius: 3,
-                              color: color,
-                              strokeWidth: 2,
-                              strokeColor: Colors.white,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  IconData _getIconForTitle(String title) {
-    if (title.contains("Temp")) return Icons.thermostat;
-    if (title.contains("Humidity")) return Icons.water_drop;
-    if (title.contains("Soil")) return Icons.grass;
-    if (title.contains("Light")) return Icons.wb_sunny;
-    return Icons.show_chart;
-  }
-
-  double _getMinY(List<double> values) {
-    final min = values.reduce((a, b) => a < b ? a : b);
-    return min - (min * 0.1); // Add 10% padding below
-  }
-
-  double _getMaxY(List<double> values) {
-    final max = values.reduce((a, b) => a > b ? a : b);
-    return max + (max * 0.1); // Add 10% padding above
-  }
-
-  double _getInterval(List<double> values) {
-    final range = _getMaxY(values) - _getMinY(values);
-    if (range <= 10) return 2;
-    if (range <= 20) return 5;
-    return 10;
   }
 }
